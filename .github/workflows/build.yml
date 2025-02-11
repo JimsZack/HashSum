@@ -30,13 +30,25 @@ jobs:
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           else
-            # 生成基于周数的版本号：v年份.周数.0
-            echo "VERSION=v$(date +'%Y.%V.0')" >> $GITHUB_ENV
-            # 创建并推送标签
+            # 生成基于周数和时间的版本号：v年份.周数.HHMM
+            CURRENT_TIME=$(date +'%H%M')
+            echo "VERSION=v$(date +'%Y.%V').${CURRENT_TIME}" >> $GITHUB_ENV
+            
+            # 检查标签是否存在
+            if git rev-parse "v$(date +'%Y.%V').${CURRENT_TIME}" >/dev/null 2>&1; then
+              echo "Tag already exists, adding random suffix..."
+              RANDOM_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+              echo "VERSION=v$(date +'%Y.%V').${CURRENT_TIME}-${RANDOM_SUFFIX}" >> $GITHUB_ENV
+            fi
+            
+            # 配置 git
             git config --global user.name 'GitHub Actions'
             git config --global user.email 'actions@github.com'
-            git tag "v$(date +'%Y.%V.0')"
-            git push origin "v$(date +'%Y.%V.0')"
+            
+            # 创建并推送标签
+            echo "Creating tag: ${{ env.VERSION }}"
+            git tag "${{ env.VERSION }}"
+            git push origin "${{ env.VERSION }}"
           fi
 
       - name: Initialize Go modules
