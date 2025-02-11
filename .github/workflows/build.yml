@@ -41,8 +41,27 @@ jobs:
 
       - name: Initialize Go modules
         run: |
-          go mod init HashSum
+          if [ ! -f "go.mod" ]; then
+            echo "Initializing new Go module..."
+            go mod init HashSum
+          else
+            echo "Go module already initialized"
+          fi
+          
+          # 确保依赖是最新的
+          echo "Downloading and verifying dependencies..."
           go mod tidy
+          if [ $? -ne 0 ]; then
+            echo "Failed to download dependencies"
+            exit 1
+          fi
+          
+          # 验证依赖
+          go mod verify
+          if [ $? -ne 0 ]; then
+            echo "Module verification failed"
+            exit 1
+          fi
 
       - name: Build for all platforms
         run: |
