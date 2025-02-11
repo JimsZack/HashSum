@@ -12,15 +12,17 @@ jobs:
   build:
     name: Build and Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # 添加写入权限
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # 更新到 v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5  # 更新到 v5
         with:
-          go-version: '1.20'
+          go-version: '1.21'  # 更新 Go 版本
 
       - name: Generate version
         id: version
@@ -92,7 +94,7 @@ jobs:
           body: |
             HashSum 自动发布版本 ${{ env.VERSION }}
             
-            发布时间：$(date +'%Y-%m-%d %H:%M:%S')
+            发布时间：${{ github.event.head_commit.timestamp }}
             
             ### 更新内容
             - 自动周更版本
@@ -109,7 +111,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # 更新到 v4
         with:
           name: builds
           path: build/
