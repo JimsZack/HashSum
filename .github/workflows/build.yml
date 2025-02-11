@@ -106,6 +106,16 @@ jobs:
                 cp README.md "$output_dir/"
                 cp LICENSE "$output_dir/" 2>/dev/null || true
                 
+                # 创建独立可执行文件的副本
+                standalone_dir="build/standalone"
+                mkdir -p "$standalone_dir"
+                if [ "$platform" = "windows" ]; then
+                  cp "$output_dir/$output_name" "$standalone_dir/HashSum-${platform}-${arch}-${VERSION}.exe"
+                else
+                  cp "$output_dir/$output_name" "$standalone_dir/HashSum-${platform}-${arch}-${VERSION}"
+                  chmod +x "$standalone_dir/HashSum-${platform}-${arch}-${VERSION}"
+                fi
+                
                 # 创建压缩包
                 if [ "$platform" = "windows" ]; then
                   (cd build && zip -r "HashSum-${platform}-${arch}-${VERSION}.zip" "${platform}-${arch}-${VERSION}")
@@ -138,16 +148,29 @@ jobs:
             - Windows (x86, x64, ARM64)
             - Linux (x86, x64, ARM64)
             - macOS (x64, ARM64)
+            
+            ### 下载说明
+            1. 完整版本（包含README和LICENSE）:
+               - Windows: `HashSum-windows-{arch}-${VERSION}.zip`
+               - Linux/macOS: `HashSum-{platform}-{arch}-${VERSION}.tar.gz`
+            
+            2. 独立可执行文件:
+               - Windows: `HashSum-windows-{arch}-${VERSION}.exe`
+               - Linux/macOS: `HashSum-{platform}-{arch}-${VERSION}`
           files: |
             build/*.zip
             build/*.tar.gz
+            build/standalone/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4  # 更新到 v4
+        uses: actions/upload-artifact@v4
         with:
           name: builds
-          path: build/
+          path: |
+            build/*.zip
+            build/*.tar.gz
+            build/standalone/
           retention-days: 5
         
