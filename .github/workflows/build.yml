@@ -173,4 +173,46 @@ jobs:
             build/*.tar.gz
             build/standalone/
           retention-days: 5
+
+      - name: Send Feishu Notification
+        if: always()  # 无论构建成功还是失败都发送通知
+        run: |
+          # 获取当前时间
+          CURRENT_DATE=$(date '+%Y/%m/%d %H:%M')
+          
+          # 设置通知状态
+          if [ ${{ job.status }} == "success" ]; then
+            STATUS="发布成功"
+            ICON="✅"
+          else
+            STATUS="发布失败"
+            ICON="❌"
+          fi
+          
+          # 构建通知内容
+          NOTIFICATION_CONTENT="{
+            \"msg_type\": \"post\",
+            \"content\": {
+              \"post\": {
+                \"zh_cn\": {
+                  \"title\": \"${ICON} HashSum发布通知\",
+                  \"content\": [
+                    [
+                      {
+                        \"tag\": \"text\",
+                        \"text\": \"名称：程序 HashSum 已发布\\n发布日期: ${CURRENT_DATE}\\n发布结果：${STATUS}！\"
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          }"
+          
+          # 发送通知到飞书
+          curl -X POST -H "Content-Type: application/json" \
+               -d "${NOTIFICATION_CONTENT}" \
+               ${{ secrets.FEISHU_WEBHOOK_URL }}
+        env:
+          TZ: 'Asia/Shanghai'  # 设置时区为中国时区
         
