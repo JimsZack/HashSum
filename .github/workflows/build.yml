@@ -1,0 +1,117 @@
+name: Build and Release
+
+on:
+  schedule:
+    - cron: '29 11 * * 1'  # 每周一 11:29 UTC
+  workflow_dispatch:  # 保留手动触发功能
+  push:
+    tags:
+      - 'v*'  # 保留标签触发功能
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      - name: Generate version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            # 生成基于周数的版本号：v年份.周数.0
+            echo "VERSION=v$(date +'%Y.%V.0')" >> $GITHUB_ENV
+            # 创建并推送标签
+            git config --global user.name 'GitHub Actions'
+            git config --global user.email 'actions@github.com'
+            git tag "v$(date +'%Y.%V.0')"
+            git push origin "v$(date +'%Y.%V.0')"
+          fi
+
+      - name: Initialize Go modules
+        run: |
+          go mod init HashSum
+          go mod tidy
+
+      - name: Build for all platforms
+        run: |
+          platforms=("windows" "linux" "darwin")
+          archs=("amd64" "386" "arm64")
+          
+          for platform in "${platforms[@]}"; do
+            for arch in "${archs[@]}"; do
+              if [ "$platform-$arch" != "darwin-386" ]; then
+                echo "Building for $platform/$arch..."
+                
+                # 设置输出目录
+                output_dir="build/${platform}-${arch}-${VERSION}"
+                mkdir -p "$output_dir"
+                
+                # 设置输出文件名
+                if [ "$platform" = "windows" ]; then
+                  output_name="HashSum.exe"
+                else
+                  output_name="HashSum"
+                fi
+                
+                # 构建
+                GOOS=$platform GOARCH=$arch go build -o "$output_dir/$output_name" .
+                
+                # 复制README和LICENSE
+                cp README.md "$output_dir/"
+                cp LICENSE "$output_dir/" 2>/dev/null || true
+                
+                # 创建压缩包
+                if [ "$platform" = "windows" ]; then
+                  (cd build && zip -r "HashSum-${platform}-${arch}-${VERSION}.zip" "${platform}-${arch}-${VERSION}")
+                else
+                  (cd build && tar czf "HashSum-${platform}-${arch}-${VERSION}.tar.gz" "${platform}-${arch}-${VERSION}")
+                fi
+              fi
+            done
+          done
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: HashSum ${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          tag_name: ${{ env.VERSION }}
+          body: |
+            HashSum 自动发布版本 ${{ env.VERSION }}
+            
+            发布时间：$(date +'%Y-%m-%d %H:%M:%S')
+            
+            ### 更新内容
+            - 自动周更版本
+            - 包含所有平台的构建版本
+            
+            ### 支持平台
+            - Windows (x86, x64, ARM64)
+            - Linux (x86, x64, ARM64)
+            - macOS (x64, ARM64)
+          files: |
+            build/*.zip
+            build/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: builds
+          path: build/
+          retention-days: 5
+        
